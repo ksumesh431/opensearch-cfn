@@ -1,0 +1,385 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template to create an OpenSearch domain with an associated IAM service-linked role and domain policy.
+
+Parameters:
+  DomainName:
+    Description: "The name of the OpenSearch domain"
+    Type: String
+    Default: "opensearch-dev"
+
+  EngineVersion:
+    Description: "The version of OpenSearch to deploy"
+    Type: String
+    Default: "OpenSearch_2.13"
+
+  InstanceType:
+    Description: "The instance type for the OpenSearch cluster"
+    Type: String
+    Default: "r6g.large.search"
+
+  InstanceCount:
+    Description: "The number of instances in the OpenSearch cluster"
+    Type: Number
+    Default: 1
+
+  DedicatedMasterEnabledParam:
+    Description: "Whether to enable dedicated master nodes"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  DedicatedMasterType:
+    Description: "The instance type for the dedicated master nodes"
+    Type: String
+    Default: "m6g.large.search"
+
+  DedicatedMasterCount:
+    Description: "The number of dedicated master nodes (Minimum 2)"
+    Type: Number
+    Default: 2
+
+  ZoneAwarenessEnabled:
+    Description: "Whether to enable zone awareness"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  AvailabilityZoneCount:
+    Description: "The number of availability zones for the domain"
+    Type: Number
+    Default: 1
+
+  EBSVolumeType:
+    Description: "The EBS volume type for the OpenSearch domain"
+    Type: String
+    Default: "gp3"
+
+  EBSVolumeSize:
+    Description: "The size of the EBS volume (in GB)"
+    Type: Number
+    Default: 800
+
+  Iops:
+    Description: "Iops for the EBS volume"
+    Type: Number
+    Default: 3000
+
+  Throughput:
+    Description: "The throughput of the EBS volume"
+    Type: Number
+    Default: 250
+
+  EBSEnabled:
+    Description: "Whether to enable EBS volumes"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+
+  EnforceHTTPS:
+    Description: "Whether to enforce HTTPS"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+
+  TLSSecurityPolicy:
+    Description: "The TLS security policy to use"
+    Type: String
+    Default: "Policy-Min-TLS-1-2-2019-07"
+
+  AdvancedSecurityEnabled:
+    Description: "Whether to enable advanced security options"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  InternalUserDatabaseEnabled:
+    Description: "Whether to enable the internal user database"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  NodeToNodeEncryptionEnabled:
+    Description: "Whether to enable node-to-node encryption"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+
+  EncryptionAtRestEnabled:
+    Description: "Whether to enable encryption at rest"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+
+  CustomEndpointEnabled:
+    Description: "If custom endpoint is enabled."
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  AwsServiceNameForLinkedRole:
+    Description: "AWS service name for linked role."
+    Type: String
+    Default: "opensearchservice.amazonaws.com"
+
+  AnonymousAuthEnabled:
+    Description: "Whether to enable anonymous access"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  CreateServiceLinkedRole:
+    Description: "Whether the service-linked role for OpenSearch should be created. Allowed values: 'true', 'false'"
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+  VpcId:
+    Description: Existing VPC ID
+    Type: String
+    Default: "vpc-51032338"
+
+  SubnetIds:
+    Description: Existing Subnet ID
+    Type: String
+    Default: "subnet-93b5b7fa" # Single subnet, comma-separated if multiple
+
+  SecurityGroupIds:
+    Description: Existing Security Group ID
+    Type: String
+    Default: "sg-0b3f4dac3daf83b6b" # Single security group, comma-separated if multiple
+
+Conditions:
+  ShouldCreateServiceLinkedRole: !Equals [!Ref CreateServiceLinkedRole, "true"]
+  ShouldCreateZoneAwarenessOpenSearch:
+    !Equals [!Ref ZoneAwarenessEnabled, "true"]
+  ShouldNotCreateZoneAwarenessOpenSearch:
+    !Equals [!Ref ZoneAwarenessEnabled, "false"]
+  EnableDedicatedMaster: !Equals [!Ref DedicatedMasterEnabledParam, "true"]
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "OpenSearch Configuration"
+        Parameters:
+          - DomainName
+          - EngineVersion
+          - InstanceType
+          - InstanceCount
+          - DedicatedMasterEnabledParam
+          - DedicatedMasterType
+          - DedicatedMasterCount
+          - ZoneAwarenessEnabled
+          - AvailabilityZoneCount
+          - EBSVolumeType
+          - EBSVolumeSize
+          - EBSEnabled
+          - Iops
+          - Throughput
+          - EnforceHTTPS
+          - TLSSecurityPolicy
+          - AdvancedSecurityEnabled
+          - InternalUserDatabaseEnabled
+          - NodeToNodeEncryptionEnabled
+          - EncryptionAtRestEnabled
+          - CustomEndpointEnabled
+          - AwsServiceNameForLinkedRole
+          - AnonymousAuthEnabled
+          - CreateServiceLinkedRole
+      - Label:
+          default: "VPC Configuration"
+        Parameters:
+          - VpcId
+          - SubnetIds
+          - SecurityGroupIds
+    ParameterLabels:
+      DomainName:
+        default: "OpenSearch Domain Name"
+      EngineVersion:
+        default: "OpenSearch Engine Version"
+      InstanceType:
+        default: "OpenSearch Instance Type"
+      InstanceCount:
+        default: "Number of Instances"
+      DedicatedMasterEnabledParam:
+        default: "Dedicated Master Nodes Enabled"
+      DedicatedMasterType:
+        default: "Dedicated Master Node Type"
+      DedicatedMasterCount:
+        default: "Number of Dedicated Master Nodes"
+      ZoneAwarenessEnabled:
+        default: "Zone Awareness Enabled"
+      AvailabilityZoneCount:
+        default: "Number of Availability Zones"
+      EBSVolumeType:
+        default: "EBS Volume Type"
+      EBSVolumeSize:
+        default: "EBS Volume Size (GB)"
+      EBSEnabled:
+        default: "EBS Volumes Enabled"
+      Iops:
+        default: "The number of I/O operations per second (IOPS) that the volume supports."
+      Throughput:
+        default: "The throughput (in MiB/s) of the EBS volumes attached to data nodes. Applies only to the gp3 volume type."
+      EnforceHTTPS:
+        default: "Enforce HTTPS"
+      TLSSecurityPolicy:
+        default: "TLS Security Policy"
+      AdvancedSecurityEnabled:
+        default: "Advanced Security Enabled"
+      InternalUserDatabaseEnabled:
+        default: "Internal User Database Enabled"
+      NodeToNodeEncryptionEnabled:
+        default: "Node-to-Node Encryption Enabled"
+      EncryptionAtRestEnabled:
+        default: "Encryption at Rest Enabled"
+      CustomEndpointEnabled:
+        default: "Custom Endpoint Enabled"
+      AwsServiceNameForLinkedRole:
+        default: "AWS Service Name for Linked Role"
+      AnonymousAuthEnabled:
+        default: "Anonymous Access Enabled"
+      CreateServiceLinkedRole:
+        default: "Create Service-Linked Role"
+      VpcId:
+        default: "VPC ID"
+      SecurityGroupIds:
+        default: "Security Group ID (comma-separated if multiple)"
+      SubnetIds:
+        default: "Subnet IDs (comma-separated if multiple. Must also enable: ZoneAwarenessEnabled for multiple subnets)"
+
+Resources:
+  # IAM Service Linked Role for OpenSearch
+  OpenSearchServiceLinkedRole:
+    Type: AWS::IAM::ServiceLinkedRole
+    Condition: ShouldCreateServiceLinkedRole
+    Properties:
+      AWSServiceName: opensearchservice.amazonaws.com
+      Description: "Service linked role for OpenSearch service"
+
+  # OpenSearch Domain
+  OpenSearchDomain:
+    Type: AWS::OpenSearchService::Domain
+    Condition: ShouldCreateZoneAwarenessOpenSearch
+    Properties:
+      DomainName: !Ref DomainName
+      EngineVersion: !Ref EngineVersion
+      ClusterConfig:
+        ColdStorageOptions:
+          Enabled: false
+        DedicatedMasterEnabled: !If [EnableDedicatedMaster, true, false]
+        DedicatedMasterCount:
+          !If [
+            EnableDedicatedMaster,
+            !Ref DedicatedMasterCount,
+            !Ref "AWS::NoValue",
+          ]
+        DedicatedMasterType:
+          !If [
+            EnableDedicatedMaster,
+            !Ref DedicatedMasterType,
+            !Ref "AWS::NoValue",
+          ]
+        InstanceType: !Ref InstanceType
+        InstanceCount: !Ref InstanceCount
+        ZoneAwarenessEnabled: !Ref ZoneAwarenessEnabled
+        ZoneAwarenessConfig:
+          AvailabilityZoneCount: !Ref AvailabilityZoneCount
+        WarmEnabled: false
+      EBSOptions:
+        EBSEnabled: !Ref EBSEnabled
+        VolumeType: !Ref EBSVolumeType
+        VolumeSize: !Ref EBSVolumeSize
+        Throughput: !Ref Throughput
+        Iops: !Ref Iops
+
+      DomainEndpointOptions:
+        EnforceHTTPS: !Ref EnforceHTTPS
+        TLSSecurityPolicy: !Ref TLSSecurityPolicy
+        CustomEndpointEnabled: !Ref CustomEndpointEnabled
+      AdvancedSecurityOptions:
+        Enabled: !Ref AdvancedSecurityEnabled
+        InternalUserDatabaseEnabled: !Ref InternalUserDatabaseEnabled
+        AnonymousAuthEnabled: !Ref AnonymousAuthEnabled
+      NodeToNodeEncryptionOptions:
+        Enabled: !Ref NodeToNodeEncryptionEnabled
+      EncryptionAtRestOptions:
+        Enabled: !Ref EncryptionAtRestEnabled
+      AccessPolicies:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: "arn:aws:iam::913058317998:role/ECSTaskLogstash-role-production"
+            Action: "es:*"
+            Resource: "arn:aws:es:us-east-1:857290109902:domain/opensearch-dev/*"
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action: "es:*"
+            Resource: "arn:aws:es:us-east-1:857290109902:domain/opensearch-dev/*"
+      VPCOptions:
+        SubnetIds: !Split [",", !Ref SubnetIds]
+        SecurityGroupIds: !Split [",", !Ref SecurityGroupIds]
+
+  # OpenSearch Domain
+  OpenSearchDomainWithoutZoneAwareness:
+    Type: AWS::OpenSearchService::Domain
+    Condition: "ShouldNotCreateZoneAwarenessOpenSearch"
+    Properties:
+      DomainName: !Ref DomainName
+      EngineVersion: !Ref EngineVersion
+      ClusterConfig:
+        ColdStorageOptions:
+          Enabled: false
+        DedicatedMasterEnabled: !If [EnableDedicatedMaster, true, false]
+        DedicatedMasterCount:
+          !If [
+            EnableDedicatedMaster,
+            !Ref DedicatedMasterCount,
+            !Ref "AWS::NoValue",
+          ]
+        DedicatedMasterType:
+          !If [
+            EnableDedicatedMaster,
+            !Ref DedicatedMasterType,
+            !Ref "AWS::NoValue",
+          ]
+        InstanceType: !Ref InstanceType
+        InstanceCount: !Ref InstanceCount
+        ZoneAwarenessEnabled: !Ref ZoneAwarenessEnabled
+        WarmEnabled: false
+      EBSOptions:
+        EBSEnabled: !Ref EBSEnabled
+        VolumeType: !Ref EBSVolumeType
+        VolumeSize: !Ref EBSVolumeSize
+        Throughput: !Ref Throughput
+        Iops: !Ref Iops
+      DomainEndpointOptions:
+        EnforceHTTPS: !Ref EnforceHTTPS
+        TLSSecurityPolicy: !Ref TLSSecurityPolicy
+        CustomEndpointEnabled: !Ref CustomEndpointEnabled
+      AdvancedSecurityOptions:
+        Enabled: !Ref AdvancedSecurityEnabled
+        InternalUserDatabaseEnabled: !Ref InternalUserDatabaseEnabled
+        AnonymousAuthEnabled: !Ref AnonymousAuthEnabled
+      NodeToNodeEncryptionOptions:
+        Enabled: !Ref NodeToNodeEncryptionEnabled
+      EncryptionAtRestOptions:
+        Enabled: !Ref EncryptionAtRestEnabled
+      AccessPolicies:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: "arn:aws:iam::913058317998:role/ECSTaskLogstash-role-production"
+            Action: "es:*"
+            Resource: "arn:aws:es:us-east-1:857290109902:domain/opensearch-dev/*"
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action: "es:*"
+            Resource: "arn:aws:es:us-east-1:857290109902:domain/opensearch-dev/*"
+      VPCOptions:
+        SubnetIds: !Split [",", !Ref SubnetIds]
+        SecurityGroupIds: !Split [",", !Ref SecurityGroupIds]
